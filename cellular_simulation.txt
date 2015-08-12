@@ -1,0 +1,1013 @@
+#ifndef CALL_H
+
+#define CALL_H
+
+#include <iostream>
+
+#include <fstream>
+
+using namespace std;
+
+//declare constants
+
+const double RADIUS = 500 ;
+
+const double EDGE = RADIUS * 0.87;  //edge to center
+
+const int NUMBER_CELL = 16;
+
+const int BAND_WIDTH = 20 ;
+
+const int MAX_CALLS = 1000; //the system can hold 80 calls at  any  one time , but
+
+                            //an unlimited number of calls on a continous basis 
+
+const int FREQ = 5 ;        //five frequencies/cell
+
+/*******************************************************************
+
+    Call structure  holds time   of  call  and  cell number where 
+
+*******************************************************************/ 
+
+struct Call
+
+{ 
+
+call  was  placed
+
+double time ; 
+
+int cell_num; 
+
+    /********************************************************************** 
+
+      status checks for the status of the call which could 
+
+be one of 6 
+
+        CALL STATES
+
+         0-  NOT-YET-ATTEMPTED: Call has not yet been made
+
+         1-  SERVICE-REQUEST MADE: Attempt has been made to allocate a frequency
+
+         2-  CALL-INPROCESS: CALL is now underway, as a frequency has been 
+
+                   successfully allocated
+
+         3-  CALL-BLOCKED: CALL has been blocked as no frequencies were available 
+
+                 at call location at time of request. If 
+
+a call is blocked 
+
+made at a later time that is specified in 
+
+         4-  CALL-COMPLETED: THE call was complete
+
+         5-  CALL-FAILED: that is there is no attempt to make the call after 
+
+       ********************************************************************/ 
+
+    
+
+                a period, and it will never be made.   
+
+int call_status ;
+
+};
+
+typedef Call Calls[MAX_CALLS];
+
+/***************************************************************************
+
+     structure that initiates frequencies and holds status of the frequency
+
+***************************************************************************/
+
+struct frequency
+
+{
+
+        
+
+         bool status  ;         /*is the frequency in use?*/ 
+
+ int call_duration ; 
+
+  
+
+};
+
+typedef frequency freq[5] ;
+
+/******************************************************************************
+
+                    defines construct of each cell
+
+******************************************************************************/
+
+struct Cell
+
+{ 
+
+//int cell_index ; 
+
+freq fr ; 
+
+};
+
+/*array  of  type  cells*/
+
+typedef Cell Cells[NUMBER_CELL];
+
+/*Reads input  file and  stores  values in call structure*/
+
+    void  Static(Calls,ifstream &, ofstream&);
+
+/************************************************************************
+
+*
+
+* 
+
+*     these are utility  functions not accesible to outside users
+
+*
+
+************************************************************************/ 
+
+     
+
+/*sets distances between various cells and those that 
+
+are not defined are 
+
+  set to zero and sets distance from one cell to 
+
+another*/
+
+ double Distance(int this_cell , int that_cell); 
+
+/*sets all frequencies to free i.e true (1) withi each 
+
+cell*/ 
+
+void Set_Freq_status(Cells); 
+
+/*checks if cell has  any free frequencies*/
+
+    int cell_status(Cells ,int i); 
+
+void call_status(Calls) ; /*reports status of call*/ 
+
+    int DataRate(Cells ); 
+
+//int channel_SIR( 
+
+/*uses dynamic allocation to allocate cells*/ 
+
+//void dynamic_allocation();
+
+    
+
+  
+
+    
+
+#endif
+
+Implementation  file
+
+#include "call.h"
+
+#include <iostream>
+
+#include <fstream>
+
+#include <queue>
+
+#include <math.h>
+
+#include <iomanip>
+
+using namespace std;
+
+  /***************************************************************
+
+  sets all distances from individual cells to other sells that can 
+
+  create interference
+
+  ****************************************************************/
+
+double Distance(int this_cell,int that_cell)
+
+{ 
+
+double d[NUMBER_CELL+2][NUMBER_CELL+2] ; 
+
+for(int j=0 ;j<= NUMBER_CELL;j++) 
+
+{ 
+
+for(int k = 0 ; k<= NUMBER_CELL; k++) 
+
+{ 
+
+d[j][k] = 0 ; 
+
+} 
+
+} 
+
+d[1][1] = 0;
+
+    d[1][2] = 2 * EDGE ;
+
+    d[1][4] = 2 * EDGE ; 
+
+d[1][5] = 4 * EDGE ; 
+
+d[1][3] = 3 * RADIUS; 
+
+d[1][13] = 4 * EDGE ; 
+
+d[2][1] = d[1][2] ; 
+
+d[2][2] = 0; 
+
+d[2][4] = 2 * EDGE; 
+
+d[2][3] = 2 * EDGE ;
+
+    d[2][5] = 2 * EDGE ; 
+
+d[2][13] = 3 * RADIUS; 
+
+d[2][6] = 4 * EDGE ;
+
+    d[2][8] = 3 * RADIUS; 
+
+d[2][14] = 4 * EDGE ; 
+
+d[3][1] = d[1][3] ; 
+
+d[3][2] = d[2][3] ; 
+
+d[3][3] = 0; 
+
+d[3][4] = 2 * EDGE ; 
+
+d[3][5] = 2 * EDGE ; 
+
+d[3][13] = 2 * EDGE ;
+
+    d[3][6] = 3 * RADIUS;
+
+    d[3][8] = 2 * EDGE ; 
+
+d[3][14] = 2 * EDGE ; 
+
+d[3][16] = 3 * RADIUS; 
+
+d[3][7] = 4 * EDGE ; 
+
+d[3][9] = 3 * RADIUS; 
+
+d[3][15] = 4 * EDGE ; 
+
+d[4][1] = d[1][2] ; 
+
+d[4][2] = d[2][4] ; 
+
+d[4][4] = 0 ; 
+
+d[4][5] = 3 * RADIUS; 
+
+d[4][3] = d[3][4] ; 
+
+d[4][13] = 2 * EDGE ; 
+
+d[4][8] = 4 * EDGE ; 
+
+d[4][14] = 3 * RADIUS; 
+
+d[4][16] = 4 * EDGE ; 
+
+d[5][1] = 4 * EDGE ; 
+
+d[5][2] = 2 * EDGE ; 
+
+d[5][4] = 3 * RADIUS; 
+
+d[5][3] = 2 * EDGE ; 
+
+d[5][13] = 4 * EDGE ; 
+
+d[5][6] = 2 * EDGE ; 
+
+d[5][8] = 2 * EDGE ; 
+
+d[5][14] = 3 * RADIUS; 
+
+d[5][7] = 3 * RADIUS; 
+
+d[5][9] = 4 * EDGE ; 
+
+d[6][2] = 4 * EDGE ; 
+
+d[6][3] = 3 * RADIUS; 
+
+d[6][14] = 4 * EDGE ; 
+
+d[6][9] = 3 * RADIUS; 
+
+d[6][10] = 4 * EDGE ; 
+
+d[6][5] = 2 * EDGE ; 
+
+d[6][8] = 2 * EDGE ; 
+
+d[6][7] = 2 * EDGE ;
+
+    d[7][11] =  4 * EDGE ; 
+
+d[7][10] = 2 * EDGE ; 
+
+d[7][12] = 3 * RADIUS; 
+
+d[7][9] = 2 * EDGE ; 
+
+d[7][15] = 4 * EDGE ; 
+
+d[7][6] = 2 * EDGE ; 
+
+d[7][8] = 2 * EDGE ; 
+
+d[7][14] = 3 * RADIUS; 
+
+d[7][5] = d[5][7] ; 
+
+d[7][3] = 4 * EDGE ; 
+
+d[8][8] = 0 ; 
+
+d[8][2] =  3 * RADIUS; 
+
+d[8][4] = 4 * EDGE ;
+
+    d[8][13] = 3 * RADIUS; 
+
+d[8][16] = 4 * EDGE ; 
+
+d[8][15] = 3 * RADIUS; 
+
+d[8][12] = 4 * EDGE ; 
+
+d[8][10] = 3 * RADIUS; 
+
+d[8][6] =  2 * EDGE ; 
+
+d[8][5] = 2 * EDGE ; 
+
+d[8][3] = 2 * EDGE ; 
+
+d[8][14] = 2 * EDGE ; 
+
+d[8][9] = 2 * EDGE ; 
+
+d[8][7] = 2 * EDGE ; 
+
+d[9][11] = d[1][3] ; 
+
+d[9][10] = d[2][3] ; 
+
+d[9][9] = 0; 
+
+d[9][12] = 2 * EDGE ; 
+
+d[9][7] = 2 * EDGE ; 
+
+d[9][15] = 2 * EDGE ;
+
+    d[9][6] = 3 * RADIUS;
+
+    d[9][8] = 2 * EDGE ; 
+
+d[9][14] = 2 * EDGE ; 
+
+d[9][16] = 3 * RADIUS; 
+
+d[9][5] = 4 * EDGE ; 
+
+d[9][3] = 3 * RADIUS; 
+
+d[9][13] = 4 * EDGE ; 
+
+d[10][11] = d[1][2] ; 
+
+d[10][10] = 0; 
+
+d[10][12] = 2 * EDGE; 
+
+d[10][9] = 2 * EDGE ;
+
+    d[10][7] = 2 * EDGE ; 
+
+d[10][15] = 3 * RADIUS; 
+
+d[10][6] = 4 * EDGE ;
+
+    d[10][8] = 3 * RADIUS; 
+
+d[10][14] = 4 * EDGE ; 
+
+d[11][11] = 0;
+
+    d[11][10] = 2 * EDGE ;
+
+    d[11][12] = 2 * EDGE ; 
+
+d[11][7] = 4 * EDGE ; 
+
+d[11][9] = 3 * RADIUS; 
+
+d[11][15] = 4 * EDGE ; 
+
+d[12][11] = d[1][2] ; 
+
+d[12][10] = d[2][4] ; 
+
+d[12][12] = 0 ; 
+
+d[12][7] = 3 * RADIUS; 
+
+d[12][9] = d[3][4] ; 
+
+d[12][15] = 2 * EDGE ; 
+
+d[12][8] = 4 * EDGE ; 
+
+d[12][14] = 3 * RADIUS; 
+
+d[12][16] = 4 * EDGE ;
+
+    d[13][1] = 4 * EDGE ; 
+
+d[13][4] = 2 * EDGE ; 
+
+d[13][2] = 3 * RADIUS; 
+
+d[13][3] = 2 * EDGE ; 
+
+d[13][5] = 4 * EDGE ; 
+
+d[13][16] = 2 * EDGE ; 
+
+d[13][14] = 2 * EDGE ; 
+
+d[13][8] = 3 * RADIUS; 
+
+d[13][15] = 3 * RADIUS; 
+
+d[13][9] = 4 * EDGE ; 
+
+d[14][14] = 0 ; 
+
+d[14][4] =  3 * RADIUS; 
+
+d[14][2] = 4 * EDGE ;
+
+    d[14][5] = 3 * RADIUS; 
+
+d[14][6] = 4 * EDGE ; 
+
+d[14][7] = 3 * RADIUS; 
+
+d[14][10] = 4 * EDGE ; 
+
+d[14][12] = 3 * RADIUS; 
+
+d[14][16] =  2 * EDGE ; 
+
+d[14][13] = 2 * EDGE ; 
+
+d[14][3] = 2 * EDGE ; 
+
+d[14][8] = 2 * EDGE ; 
+
+d[14][9] = 2 * EDGE ; 
+
+d[14][15] = 2 * EDGE ; 
+
+d[15][11] =  4 * EDGE ; 
+
+d[15][12] = 2 * EDGE ; 
+
+d[15][10] = 3 * RADIUS; 
+
+d[15][9] = 2 * EDGE ; 
+
+d[15][7] = 4 * EDGE ; 
+
+d[15][16] = 2 * EDGE ; 
+
+d[15][14] = 2 * EDGE ; 
+
+d[15][8] = 3 * RADIUS; 
+
+d[15][13] = d[5][7] ; 
+
+d[15][3] = 4 * EDGE ; 
+
+d[16][4] = 4 * EDGE ; 
+
+d[16][3] = 3 * RADIUS; 
+
+d[16][8] = 4 * EDGE ; 
+
+d[16][9] = 3 * RADIUS; 
+
+d[16][12] = 4 * EDGE ; 
+
+d[16][13] = 2 * EDGE ; 
+
+d[16][14] = 2 * EDGE ; 
+
+d[16][15] = 2 * EDGE ; 
+
+/* for(int ji=0 ; ji<= NUMBER_CELL  ; ji++) 
+
+{ 
+
+for(int ki=0 ;ki <= NUMBER_CELL  ; ki++) 
+
+{ 
+
+cout<<d[ji][ki]<<"---->"<<ji<<":"<<ki<<endl; 
+
+} 
+
+}
+
+cout<<"end"<<endl;*/
+
+  return d[this_cell][that_cell] ;
+
+ 
+
+}
+
+void Set_Freq_status(Cells cl)
+
+{ 
+
+/*A bit complex to read : Cell 1 a  frequency that is in use*/
+
+for(int l = 0; l <= NUMBER_CELL-1 ;l++ ) 
+
+{ 
+
+for (int j = 0; j <= FREQ-1 ; j++) 
+
+{ 
+
+/*true : frequency is free*/ 
+
+} 
+
+        cl[l].fr[j].status =  true ; 
+
+}
+
+}
+
+/*Reads input from file provided by client*/ 
+
+void Static(Calls call, ifstream & infile ,ofstream & outfile)
+
+{ 
+
+Cells cell;
+
+    
+
+    std::queue<int> call_queue; 
+
+Set_Freq_status(cell);/*All frequencies are freed*/ 
+
+    int count = 0; 
+
+int call_count = 0; 
+
+int blocked_call = 0; 
+
+ 
+
+    infile>>call[count].time;    /*call duration*/
+
+    infile.ignore(1,'\n');        /*ignore comma*/  
+
+    infile>>call[count].cell_num ; 
+
+call_queue.push(count) ; 
+
+outfile << "Call #   "<< "    Blocked  at  Time  T " <<endl;
+
+  
+
+    /*begin reading the file , and store all values in call struct*/ 
+
+while(call[count].time != 00) 
+
+{ 
+
+     
+
+         
+
+         
+
+ count ++; 
+
+ infile>>call[count].time ;    /*call duration*/
+
+ infile.ignore(1,'\n');        /*ignore comma*/  
+
+ infile>>call[count].cell_num ;
+
+         call_queue.push(count) ; 
+
+ /************************************************/ 
+
+} 
+
+  
+
+/*this is a test to see what the queue contains*/ 
+
+int timer = 0; 
+
+while(timer < 150 ) 
+
+{ 
+
+    while(!call_queue.empty()) 
+
+{ 
+
+    //cout <<call_queue.front(); 
+
+    int t = call_queue.front(); 
+
+    call_queue.pop(); 
+
+    call[t].call_status = 1 ; 
+
+    if(call[t].call_status == 1) 
+
+{ 
+
+        cout <<"CALL NOT YET ATTEMPTED" <<endl; 
+
+} 
+
+else if(call[t].call_status == 3) 
+
+{ 
+
+} 
+
+} 
+
+cout <<"CALL IN PROCESS" <<endl; 
+
+       // int t = call_queue.front(); 
+
+//call_queue.pop(); 
+
+             int temp = cell_status(cell,call[call_count].cell_num); 
+
+ 
+
+while(call[call_count + 1].time == timer+1)/*time starts at 1 ...*/ 
+
+ { 
+
+ cout<<call_count+1<<"th"<<" call at time :"<<call[call_count].time<<endl; 
+
+ //check status of frequencies in cell and assign first free frequency 
+
+ //else push to queue
+
+ 
+
+ if(temp != -1) 
+
+ { 
+
+ cell[timer].fr[temp].status = false ; /*now in use*/ 
+
+ call[call_count].call_status = 3 ; 
+
+ double data_rate = DataRate(cell) ; 
+
+ cout << "Data rate for this call : "<<data_rate<<endl<<endl; 
+
+ 
+
+          
+
+ } 
+
+ else 
+
+ { 
+
+later"<<endl<<endl; 
+
+ blocked_call ++ ; 
+
+ cout <<"All frequencies busy , Call will be reassigned 
+
+ 
+
+ outfile <<call_count+1 <<setw(15)<< timer+1 <<endl<<endl; 
+
+ }
+
+             
+
+ 
+
+ call_count++; 
+
+ } 
+
+timer++; 
+
+} 
+
+cout << "Number of blocked calls upon first attempt :"<<blocked_call << endl; 
+
+}
+
+/*checks if there is a free frequency in the cell*/
+
+int cell_status(Cells cell ,int i)
+
+{ 
+
+//Cells cell ; 
+
+for (int j = 1 ; j <= 5 ;j++ ) 
+
+{ 
+
+    if(cell[i].fr[j].status == true )/*frequency is free*/ 
+
+            cell[i].fr[j].status = false ;
+
+            
+
+{
+
+cout<<"frequency :"<<j <<"in cell  "<<i<< "  is free:"<< "and is assigned"<<endl; 
+
+return j; 
+
+} 
+
+else if(cell[i].fr[j+1].status == true) 
+
+{ 
+
+cell[i].fr[j+1].status = false ;
+
+              cout<<"frequency :"<<j+1 <<"is free:"<< "and is assigned"<<endl;
+
+            return j+1; 
+
+         else if(cell[i].fr[j+2].status == true) 
+
+}
+
+{ 
+
+cell[i].fr[j+2].status = false ;
+
+            cout<<"frequency :"<<j+2 <<"is free:"<< "and is assigned"<<endl;
+
+            return j+2; 
+
+} 
+
+else if(cell[i].fr[j+3].status == true) 
+
+{ 
+
+cell[i].fr[j+3].status = false ;
+
+            cout<<"frequency :"<<j +3<<"is free:"<< "and is assigned"<<endl;
+
+            return j+3; 
+
+} 
+
+else if(cell[i].fr[j+4].status == true) 
+
+{ 
+
+cell[i].fr[j+4].status = false ;
+
+            cout<<"frequency :"<<j+4 <<"is free:"<< "and is assigned"<<endl;
+
+            return j+4; 
+
+} 
+
+else 
+
+{ 
+
+return -1; 
+
+} 
+
+}
+
+        //shouldn't get here 
+
+return -2; 
+
+}
+
+/*calculates  SI , SIR  AND   data  rate */ 
+
+int DataRate(Cells cell)
+
+{ 
+
+/*we  need  to  know  the   number  of  interfering  frequencies */
+
+    /*i.e top subscript , which we will calculate later*/ 
+
+int top_subscript = 4;
+
+    
+
+double distance_cubed  =  Distance(1,5)* Distance(1,5)* Distance(1,5); 
+
+double s_i ;
+
+    
+
+double radius_cubed;
+
+    
+
+int SIR;
+
+    
+
+double R;/*data rate*/
+
+    
+
+if (top_subscript!=0) 
+
+{//begin if 
+
+for(int k = 1; k <= top_subscript; k++) 
+
+{ 
+
+if(top_subscript == 1) 
+
+{ 
+
+   distance_cubed = distance_cubed  ; 
+
+} 
+
+else 
+
+{ 
+
+distance_cubed += distance_cubed  ; 
+
+} 
+
+} 
+
+radius_cubed = RADIUS * RADIUS * RADIUS ; 
+
+s_i = 1.0/ (radius_cubed  *  (1.0/distance_cubed)) ; 
+
+ 
+
+SIR = 10 * log10(s_i); 
+
+    /*SIR = signal to interferece channel*/ 
+
+ /*if SIR is less than 9 , call must be dropped*/ 
+
+if(SIR < 9.0) 
+
+{ 
+
+cout <<"Call rejected"<<endl; 
+
+return 0; 
+
+} 
+
+    /* using log base 2*/ 
+
+/*R is datarate */ 
+
+ R = BAND_WIDTH *  (log(SIR)/log(2.0)) ; 
+
+}//end if
+
+    else 
+
+{ 
+
+}
+
+    
+
+return R ; 
+
+R = 240 ; 
+
+}
+
+Client  File
+
+#include <iostream>
+
+#include "call.h"
+
+#include <fstream>
+
+using namespace std;
+
+int main()
+
+{ 
+
+    
+
+//Cell_cluster zone; 
+
+    Calls call ; 
+
+    /*name of input file*/ 
+
+ifstream infile("data.txt"); 
+
+/*name of output file*/ 
+
+ofstream outfile("output.txt"); 
+
+    /*if error while opening, exit*/ 
+
+if(!infile) 
+
+{ 
+
+cerr<<"input file could not be opened\n"; 
+
+exit(1); 
+
+}
+
+    
+
+/*error while opening file to be written to*/ 
+
+if(!outfile) 
+
+{
+
+        cerr<<"output file could not be opened\n"; 
+
+}
+
+   
+
+Static(call,infile,outfile);
+
+   
+
+cout <<"******************"<<endl; 
+
+return 0 ;
+
+}
+
+exit(1);
